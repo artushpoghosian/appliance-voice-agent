@@ -1,0 +1,57 @@
+{
+  "model_config": {
+    "type": "cascading",
+    "primary": { "model": "gemini-3.0-flash" },
+    "temperature": 0.2
+  },
+  "start_speaker": "agent",
+  "begin_message": "Thanks for calling {{company_name}}, this is {{agent_name}}. How can I help?",
+  "general_prompt": "${file:system-prompt.md}",
+  "default_dynamic_variables": {
+    "company_name": "FixCall AI",
+    "agent_name": "Mia"
+  },
+  "general_tools": [
+    {
+      "type": "end_call",
+      "name": "end_call",
+      "description": "Hang up. Use after the goodbye, after taking a warranty-company message, or right after saying \"Sorry, I can't help you with that.\" to a spam caller."
+    },
+    {
+      "type": "custom",
+      "name": "book_service_call",
+      "description": "Book a repair visit. Call once, only after the intake details are in and, for a standard job, the caller clearly accepted the $99 service call fee. Never for warranty-company reps, spam, or callback messages. Relay only the returned `say`; it is booked only if `result` is `booked`.",
+      "url": "${N8N_BASE_URL}/webhook/retell/book-service-call",
+      "method": "POST",
+      "headers": { "X-Webhook-Secret": "${WEBHOOK_SECRET}" },
+      "args_at_root": false,
+      "speak_during_execution": false,
+      "speak_after_execution": true,
+      "execution_message_type": "static_text",
+      "execution_message_description": "One moment while I book that.",
+      "timeout_ms": 10000,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "enum": ["standard", "warranty"],
+            "description": "warranty only when the caller said the appliance is under the manufacturer's warranty; otherwise standard."
+          },
+          "caller_name": { "type": "string", "description": "Caller's full name." },
+          "phone": { "type": "string", "description": "Confirmed callback number, digits only with country code, e.g. +15125550142." },
+          "service_address": { "type": "string", "description": "Confirmed service address: street, unit, city." },
+          "appliance_type": { "type": "string", "description": "The appliance, e.g. dryer, refrigerator, dishwasher." },
+          "brand": { "type": "string", "description": "Appliance brand as the caller said it." },
+          "issue": { "type": "string", "description": "What is wrong, in the caller's words, short." },
+          "fee_accepted": {
+            "type": "boolean",
+            "description": "true only after the caller heard and accepted the $99 fee; leave out for warranty."
+          },
+          "notes": { "type": "string", "description": "Anything else useful: model number, error code, access notes, other appliances, questions for the team." }
+        },
+        "required": ["job_type", "caller_name", "phone", "service_address", "appliance_type", "brand", "issue"]
+      }
+    }
+  ]
+}

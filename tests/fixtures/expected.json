@@ -1,0 +1,18 @@
+{
+  "booking": {
+    "standard-fee-accepted": "booked",
+    "standard-fee-not-stated": "fee_required",
+    "warranty-lg": "booked",
+    "warranty-whirlpool": "not_covered",
+    "missing-address": "missing"
+  },
+  "post-call": {
+    "standard-booking": "standard_booking",
+    "warranty-booking": "warranty_booking",
+    "warranty-company": "warranty_company_message",
+    "no-booking": "no_booking",
+    "spam": "spam",
+    "other-callback-webcall": "other",
+    "call-ended": null
+  }
+}

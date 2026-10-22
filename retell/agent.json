@@ -1,0 +1,41 @@
+{
+  "agent_name": "Appliance repair receptionist",
+  "voice_id": "retell-Brynne",
+  "language": "en-US",
+  "timezone": "America/New_York",
+  "enable_backchannel": true,
+  "boosted_keywords": [
+    "LG", "Samsung", "GE", "General Electric", "Whirlpool", "Frigidaire", "Maytag",
+    "KitchenAid", "Bosch", "American Home Shield", "Choice Home Warranty",
+    "washer", "dryer", "dishwasher", "refrigerator", "freezer", "gas"
+  ],
+  "end_call_after_silence_ms": 30000,
+  "max_call_duration_ms": 900000,
+  "webhook_url": "${N8N_BASE_URL}/webhook/retell/post-call",
+  "webhook_events": ["call_analyzed"],
+  "post_call_analysis_data": [
+    {
+      "type": "enum",
+      "name": "caller_type",
+      "description": "Who called. standard_customer: own appliance needs repair, no covered warranty. warranty_customer: own LG, Samsung or GE appliance under manufacturer's warranty. warranty_company: rep from a home warranty company. spam: sales, SEO, loans, robocalls, car extended warranty. other: wants a person, existing job, or anything else.",
+      "choices": ["standard_customer", "warranty_customer", "warranty_company", "spam", "other"]
+    },
+    {
+      "type": "enum",
+      "name": "outcome",
+      "description": "booked: book_service_call returned booked. message_taken: a message or callback request was taken. fee_declined: the caller declined or was unsure about the $99 fee. incomplete: the call ended before intake was finished. dropped: the caller hung up early or the agent ended a spam call.",
+      "choices": ["booked", "message_taken", "fee_declined", "incomplete", "dropped"]
+    },
+    { "type": "string", "name": "caller_name", "description": "Caller's name as given. Empty if not given." },
+    { "type": "string", "name": "callback_number", "description": "Callback number the caller confirmed or gave. Empty if none." },
+    { "type": "string", "name": "service_address", "description": "Service address as confirmed. Empty if not given." },
+    { "type": "string", "name": "appliance", "description": "Appliance type, e.g. dryer. Empty if not given." },
+    { "type": "string", "name": "brand", "description": "Appliance brand. Empty if not given." },
+    { "type": "string", "name": "issue", "description": "The problem in a few words. Empty if not given." },
+    { "type": "string", "name": "warranty_company", "description": "Home warranty company name, for warranty-company reps only. Empty otherwise." },
+    { "type": "string", "name": "job_details", "description": "For warranty-company reps: homeowner, address, appliance, problem, and any claim or work-order number. Empty otherwise." },
+    { "type": "string", "name": "notes", "description": "Other useful details or questions the caller asked that the agent could not answer. Empty if none. Never invent anything." },
+    { "type": "boolean", "name": "warranty_mentioned", "description": "True if the caller brought up a warranty of any kind." },
+    { "type": "boolean", "name": "fee_accepted", "description": "True only if the agent stated the $99 service call fee and the caller clearly accepted it." }
+  ]
+}

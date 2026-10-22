@@ -1,0 +1,163 @@
+{
+  "name": "Retell WF-B · post-call alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell/post-call",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "78157fef-4413-4014-a04c-bcdd70ad4b1b",
+      "name": "Retell webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "85bc4c5b-7936-4872-948b-fa0ca56f0e03"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verifies Retell's x-retell-signature (v=<ms>,d=<hex HMAC-SHA256(rawBody + v)>)\n// and passes on the parsed payload. Throws on anything invalid, so the error\n// workflow reports it. Self-hosted n8n needs NODE_FUNCTION_ALLOW_BUILTIN=crypto.\nconst crypto = require('crypto');\n\n// Preferred: n8n Variable RETELL_WEBHOOK_KEY. Without Variables on your plan,\n// paste the Retell API key that has the webhook badge here instead.\nconst RETELL_WEBHOOK_KEY_CONSTANT = 'PASTE_RETELL_WEBHOOK_KEY_HERE';\nconst MAX_AGE_MS = 5 * 60 * 1000;\n\nlet key = '';\ntry {\n  key = ($vars && $vars.RETELL_WEBHOOK_KEY) || '';\n} catch (e) {\n  // Variables are not available on this plan\n}\nif (!key && !RETELL_WEBHOOK_KEY_CONSTANT.startsWith('PASTE_')) key = RETELL_WEBHOOK_KEY_CONSTANT;\nif (!key) {\n  throw new Error('No Retell webhook key: set the n8n Variable RETELL_WEBHOOK_KEY or the constant in \"Verify signature\".');\n}\n\nconst item = $input.first();\nif (!item.binary || !item.binary.data) {\n  throw new Error('No raw body: turn on the \"Raw Body\" option of the \"Retell webhook\" node.');\n}\nconst h = typeof helpers !== 'undefined' && helpers ? helpers : this && this.helpers;\nconst raw = h && typeof h.getBinaryDataBuffer === 'function'\n  ? (await h.getBinaryDataBuffer(0, 'data')).toString('utf8')\n  : Buffer.from(item.binary.data.data, 'base64').toString('utf8');\n\nconst headers = item.json.headers || {};\nconst match = /^v=(\\d+),d=([0-9a-f]+)$/i.exec(String(headers['x-retell-signature'] || '').trim());\nif (!match) throw new Error('Missing or malformed x-retell-signature header');\nconst [, ts, digest] = match;\nif (Math.abs(Date.now() - Number(ts)) > MAX_AGE_MS) {\n  throw new Error('Stale Retell signature (more than 5 minutes off)');\n}\nconst expected = crypto.createHmac('sha256', key).update(raw + ts).digest();\nconst given = Buffer.from(digest, 'hex');\nif (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {\n  throw new Error('Invalid signature: not from Retell, or the webhook key is wrong');\n}\n\nreturn [{ json: JSON.parse(raw) }];\n"
+      },
+      "id": "f0916105-dad2-4dfb-a08d-bccf09cc7c78",
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "289eb77a-d8c1-4590-b7c8-f1ef60da5026",
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "call_analyzed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5ceeb9ea-4122-491f-a4eb-946e640a5066",
+      "name": "Only call_analyzed",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns a verified call_analyzed payload into one Telegram HTML message.\n// Missing values print as \"—\"; nothing is filled in.\n\n// ---- config ----------------------------------------------------------------\nconst TIME_ZONE = 'America/New_York'; // company time zone\nconst MAX_LEN = 4096; // Telegram message limit\nconst FIELD_MAX = 400; // characters per field before trimming\n// ----------------------------------------------------------------------------\n\nconst call = $input.first().json.call || {};\n\n// Retell retries webhooks; send one alert per call.\nconst store = $getWorkflowStaticData('global');\nconst alerted = (store.alertedCalls = store.alertedCalls || {});\nconst cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;\nfor (const id of Object.keys(alerted)) if (alerted[id] < cutoff) delete alerted[id];\nif (call.call_id && alerted[call.call_id]) return [];\nif (call.call_id) alerted[call.call_id] = Date.now();\n\nconst analysis = call.call_analysis || {};\nconst d = analysis.custom_analysis_data || {};\n\nconst DASH = '—';\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst has = (v) => v !== undefined && v !== null && String(v).trim() !== '';\nconst cut = (s, n) => (s.length <= n ? s : n <= 1 ? '…' : `${s.slice(0, n - 1)}…`);\nconst val = (v, n = FIELD_MAX) => (has(v) ? esc(cut(String(v).trim(), n)) : DASH);\nconst yesNo = (v) => (v === true ? 'yes' : v === false ? 'no' : DASH);\n\nconst durationMs = has(call.duration_ms)\n  ? Number(call.duration_ms)\n  : has(call.start_timestamp) && has(call.end_timestamp) ? call.end_timestamp - call.start_timestamp : NaN;\nconst duration = Number.isFinite(durationMs)\n  ? `${Math.floor(Math.round(durationMs / 1000) / 60)}m ${Math.round(durationMs / 1000) % 60}s`\n  : DASH;\nconst started = has(call.start_timestamp) && Number.isFinite(new Date(Number(call.start_timestamp)).getTime())\n  ? new Date(Number(call.start_timestamp)).toLocaleString('en-US', {\n    timeZone: TIME_ZONE, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',\n  })\n  : DASH;\nconst recording = has(call.recording_url) ? `<a href=\"${esc(call.recording_url)}\">Listen</a>` : DASH;\n\nconst type = d.caller_type;\nconst outcome = d.outcome;\nlet template;\nif (type === 'spam') template = 'spam';\nelse if (type === 'warranty_company') template = 'warranty_company_message';\nelse if (outcome === 'booked') template = type === 'warranty_customer' ? 'warranty_booking' : 'standard_booking';\nelse if (['fee_declined', 'dropped', 'incomplete'].includes(outcome) && type !== 'other') template = 'no_booking';\nelse template = 'other';\n\nconst NO_BOOKING_REASON = { fee_declined: 'fee declined', dropped: 'caller hung up', incomplete: 'intake not finished' };\n\nfunction render(summaryMax) {\n  const summary = has(analysis.call_summary) ? esc(cut(String(analysis.call_summary).trim(), summaryMax)) : DASH;\n  if (template === 'spam') {\n    const oneLine = has(analysis.call_summary)\n      ? esc(cut(String(analysis.call_summary).replace(/\\s+/g, ' ').trim(), Math.min(summaryMax, 200)))\n      : DASH;\n    return `🚫 Spam from ${val(call.from_number)} · ${duration} · ${oneLine}`;\n  }\n  const footer = [\n    `Caller ID: ${val(call.from_number)}`,\n    `Time: ${started} · Duration: ${duration}`,\n    `Summary: ${summary}`,\n    `Recording: ${recording}`,\n  ];\n  const job = [\n    `Name: ${val(d.caller_name)}`,\n    `Callback: ${val(d.callback_number)}`,\n    `Address: ${val(d.service_address)}`,\n    `Appliance: ${val(d.appliance)} · Brand: ${val(d.brand)}`,\n    `Issue: ${val(d.issue)}`,\n    `Notes: ${val(d.notes)}`,\n  ];\n  let head;\n  if (template === 'standard_booking') {\n    head = ['🔧 <b>New booking: standard job</b>', `$99 fee accepted: ${yesNo(d.fee_accepted)}`, ...job];\n  } else if (template === 'warranty_booking') {\n    head = ['🛡️ <b>New booking: warranty job</b> (no fee)', `Warranty brand: ${val(d.brand)}`, ...job];\n  } else if (template === 'warranty_company_message') {\n    head = [\n      '📨 <b>Message from a warranty company</b>',\n      `Company: ${val(d.warranty_company)}`,\n      `Name: ${val(d.caller_name)}`,\n      `Callback: ${val(d.callback_number)}`,\n      `Job: ${val(d.job_details)}`,\n      `Notes: ${val(d.notes)}`,\n    ];\n  } else if (template === 'no_booking') {\n    head = [`⚠️ <b>No booking</b> (${NO_BOOKING_REASON[outcome]})`, ...job];\n  } else {\n    head = [\n      '📞 <b>Callback request / other call</b>',\n      `Name: ${val(d.caller_name)}`,\n      `Callback: ${val(d.callback_number)}`,\n      `Issue: ${val(d.issue)}`,\n      `Notes: ${val(d.notes)}`,\n    ];\n  }\n  return [...head, '', ...footer].join('\\n');\n}\n\nlet summaryMax = 3000;\nlet text = render(summaryMax);\nwhile (text.length > MAX_LEN && summaryMax > 0) {\n  summaryMax = Math.max(0, summaryMax - (text.length - MAX_LEN) - 20);\n  text = render(summaryMax);\n}\nif (text.length > MAX_LEN) text = text.slice(0, text.lastIndexOf('\\n', MAX_LEN)); // whole lines keep tags balanced\n\nreturn [{ json: { text, silent: template === 'spam', template, call_id: call.call_id || null } }];\n"
+      },
+      "id": "8c3475de-fa95-446a-91de-c4c80a29ebbd",
+      "name": "Build alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "PASTE_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true,
+          "disable_notification": "={{ $json.silent }}"
+        }
+      },
+      "id": "bbbeb6d2-5374-48cd-a603-0f0ada1e199c",
+      "name": "Send to Call Feed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "telegramApi": {
+          "id": null,
+          "name": "Telegram - Call Feed"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Retell webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature": {
+      "main": [
+        [
+          {
+            "node": "Only call_analyzed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only call_analyzed": {
+      "main": [
+        [
+          {
+            "node": "Build alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build alert": {
+      "main": [
+        [
+          {
+            "node": "Send to Call Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

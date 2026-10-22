@@ -1,0 +1,27 @@
+{
+  "name": "book_service_call",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_missing_address",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550155",
+    "to_number": "+15125550100",
+    "call_status": "ongoing",
+    "transcript": "Agent: Just so you know, there's a $99 service call fee for the technician to come out. Is that okay?\nUser: Sure.",
+    "transcript_object": [
+      { "role": "agent", "content": "Just so you know, there's a $99 service call fee for the technician to come out. Is that okay?" },
+      { "role": "user", "content": "Sure." }
+    ]
+  },
+  "args": {
+    "job_type": "standard",
+    "caller_name": "Chris Doe",
+    "phone": "+15125550155",
+    "service_address": "",
+    "appliance_type": "oven",
+    "brand": "Bosch",
+    "issue": "Won't heat past 200 degrees",
+    "fee_accepted": true
+  }
+}

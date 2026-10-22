@@ -1,0 +1,28 @@
+{
+  "name": "book_service_call",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_standard_no_fee_quote",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550177",
+    "to_number": "+15125550100",
+    "call_status": "ongoing",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: My Frigidaire fridge is leaking. I'm Tom Reed at 9 Elm Road, call me at 512-555-0177.\nAgent: Thanks, Tom. Let me get that booked.",
+    "transcript_object": [
+      { "role": "agent", "content": "Thanks for calling Acme Appliance Repair, this is Sam. How can I help?" },
+      { "role": "user", "content": "My Frigidaire fridge is leaking. I'm Tom Reed at 9 Elm Road, call me at 512-555-0177." },
+      { "role": "agent", "content": "Thanks, Tom. Let me get that booked." }
+    ]
+  },
+  "args": {
+    "job_type": "standard",
+    "caller_name": "Tom Reed",
+    "phone": "+15125550177",
+    "service_address": "9 Elm Road",
+    "appliance_type": "refrigerator",
+    "brand": "Frigidaire",
+    "issue": "Leaking water",
+    "fee_accepted": true
+  }
+}

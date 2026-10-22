@@ -1,0 +1,36 @@
+{
+  "name": "book_service_call",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_standard_ok",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550142",
+    "to_number": "+15125550100",
+    "call_status": "ongoing",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: Hi, my Whirlpool dryer isn't heating.\nAgent: Sorry to hear that. Can I get your name?\nUser: Maria Lopez.\nAgent: Thanks, Maria. What's the address for the visit?\nUser: 412 Oak Street, Austin.\nAgent: Got it. Is 512-555-0142 the best number to reach you?\nUser: Yes.\nAgent: Just so you know, there's a $99 service call fee for the technician to come out. Is that okay?\nUser: Yeah, that's fine.",
+    "transcript_object": [
+      { "role": "agent", "content": "Thanks for calling Acme Appliance Repair, this is Sam. How can I help?" },
+      { "role": "user", "content": "Hi, my Whirlpool dryer isn't heating." },
+      { "role": "agent", "content": "Sorry to hear that. Can I get your name?" },
+      { "role": "user", "content": "Maria Lopez." },
+      { "role": "agent", "content": "Thanks, Maria. What's the address for the visit?" },
+      { "role": "user", "content": "412 Oak Street, Austin." },
+      { "role": "agent", "content": "Got it. Is 512-555-0142 the best number to reach you?" },
+      { "role": "user", "content": "Yes." },
+      { "role": "agent", "content": "Just so you know, there's a $99 service call fee for the technician to come out. Is that okay?" },
+      { "role": "user", "content": "Yeah, that's fine." }
+    ]
+  },
+  "args": {
+    "job_type": "standard",
+    "caller_name": "Maria Lopez",
+    "phone": "+15125550142",
+    "service_address": "412 Oak Street, Austin, TX",
+    "appliance_type": "dryer",
+    "brand": "Whirlpool",
+    "issue": "Not heating",
+    "fee_accepted": true,
+    "notes": "Side gate code 4411"
+  }
+}

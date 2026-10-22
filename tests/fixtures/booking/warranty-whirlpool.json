@@ -1,0 +1,26 @@
+{
+  "name": "book_service_call",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_warranty_whirlpool",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550123",
+    "to_number": "+15125550100",
+    "call_status": "ongoing",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: My Whirlpool dishwasher won't start and it's under warranty.",
+    "transcript_object": [
+      { "role": "agent", "content": "Thanks for calling Acme Appliance Repair, this is Sam. How can I help?" },
+      { "role": "user", "content": "My Whirlpool dishwasher won't start and it's under warranty." }
+    ]
+  },
+  "args": {
+    "job_type": "warranty",
+    "caller_name": "Lee Park",
+    "phone": "+15125550123",
+    "service_address": "5 Birch Lane",
+    "appliance_type": "dishwasher",
+    "brand": "Whirlpool",
+    "issue": "Won't start"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "event": "call_analyzed",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_pc_warranty",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550199",
+    "to_number": "+15125550100",
+    "call_status": "ended",
+    "start_timestamp": 1792512000000,
+    "end_timestamp": 1792512192000,
+    "duration_ms": 192000,
+    "disconnection_reason": "agent_hangup",
+    "recording_url": "https://dxc03zgurdly9.cloudfront.net/call_fx_pc_warranty/recording.wav",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: ...",
+    "call_analysis": {
+      "call_summary": "Dana Kim reported an LG washer showing an OE error, still under LG warranty. Booked as a warranty job with no fee.",
+      "user_sentiment": "Neutral",
+      "call_successful": true,
+      "in_voicemail": false,
+      "custom_analysis_data": {
+        "caller_type": "warranty_customer",
+        "outcome": "booked",
+        "caller_name": "Dana Kim",
+        "callback_number": "+15125550199",
+        "service_address": "77 Pine Ave",
+        "appliance": "washer",
+        "brand": "LG",
+        "issue": "OE error, not draining",
+        "notes": "Model WM3900HWA",
+        "warranty_mentioned": true,
+        "fee_accepted": false
+      }
+    }
+  }
+}

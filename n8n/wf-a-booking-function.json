@@ -1,0 +1,308 @@
+{
+  "name": "Retell WF-A · book_service_call",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell/book-service-call",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d7a96bba-07d9-44e6-95e6-d25b337fa135",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "3124930c-ab75-4358-899c-10189f2753c8",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Retell booking secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Checks a Retell book_service_call request before anything is logged.\n// Every result carries a `say` line the agent acts on.\n\n// ---- config ----------------------------------------------------------------\nconst NEXT_STEPS = 'The office will reach out to confirm the appointment time.';\nconst FEE_LINE = \"Just so you know, there's a $99 service call fee for the technician to come out. Is that okay?\";\nconst COVERED_BRANDS = /^(lg|samsung|ge|general electric)\\b/; // matched against the normalized brand\nconst FEE_SPOKEN = /\\$\\s?99\\b|\\bninety[\\s-]?nine\\b|\\b99 dollars?\\b/i;\nconst DEDUPE_DAYS = 30;\nconst FEE_YES = /\\b(yes|yeah|yep|yup|sure|ok|okay|alright|all right|fine|go ahead|sounds good|that works|absolutely|of course|perfect)\\b/i;\nconst NO_HOUSE_NUMBER = /no house number/i; // what the agent writes in notes when the caller can't give one\nconst FEE_NO = /\\b(no|nope|not sure|too much|too expensive|can't afford|rather not|don't book)\\b/i;\n// ----------------------------------------------------------------------------\n\nconst body = $input.first().json.body || {};\nconst args = body.args || {};\nconst call = body.call || {};\nconst callId = String(call.call_id || '').trim();\n\nconst text = (v) => (v === undefined || v === null ? '' : String(v).trim());\nconst reply = (result, say, extra = {}) => [\n  { json: { result, say, response: { result, say }, append_row: false, call_id: callId, ...extra } },\n];\nconst list = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);\n\n// 1. Required arguments\nconst jobType = text(args.job_type).toLowerCase();\nif (jobType !== 'standard' && jobType !== 'warranty') {\n  return reply('missing', 'Set job_type to standard or warranty, then try again.');\n}\nconst LABELS = {\n  caller_name: \"the caller's name\",\n  phone: 'the best callback number',\n  service_address: 'the service address',\n  appliance_type: 'which appliance it is',\n  brand: 'the brand',\n  issue: \"what's wrong with it\",\n};\nconst missing = Object.keys(LABELS).filter((k) => !text(args[k]));\nif (missing.length) {\n  return reply('missing', `Ask for ${list(missing.map((k) => LABELS[k]))}, then try again.`);\n}\n\n// The address needs a house number, unless the caller couldn't give one\nif (!/\\d/.test(text(args.service_address)) && !NO_HOUSE_NUMBER.test(text(args.notes))) {\n  return reply('missing', 'Ask for the house number of the service address, then try again.');\n}\n\n// 2. Warranty brand\nconst brand = text(args.brand).toLowerCase().replace(/\\./g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();\nif (jobType === 'warranty' && !COVERED_BRANDS.test(brand)) {\n  return reply(\n    'not_covered',\n    \"We only do warranty work for LG, Samsung and GE, so this can't be a warranty job. \" +\n      `Offer a standard visit instead: \"${FEE_LINE}\" Book it as a standard job only after a clear yes.`,\n  );\n}\n\n// 3. Fee gate for standard jobs: accepted, and the agent actually said the fee\nif (jobType === 'standard') {\n  const accepted = args.fee_accepted === true || text(args.fee_accepted).toLowerCase() === 'true';\n  const turns = Array.isArray(call.transcript_object) && call.transcript_object.length\n    ? call.transcript_object.filter((t) => t && t.role).map((t) => ({ role: String(t.role).toLowerCase(), content: text(t.content) }))\n    : text(call.transcript).split('\\n').map((line) => /^\\s*(agent|user)\\s*:\\s*(.*)$/i.exec(line)).filter(Boolean)\n      .map((m) => ({ role: m[1].toLowerCase(), content: m[2] }));\n  // The caller's answer to the last fee line: their turns until the agent speaks again.\n  let lastFee = -1;\n  turns.forEach((t, i) => { if (t.role === 'agent' && FEE_SPOKEN.test(t.content)) lastFee = i; });\n  const answer = [];\n  for (const t of turns.slice(lastFee + 1)) { if (t.role === 'agent') break; answer.push(t.content); }\n  const said = answer.join(' ').replace(/\\bno (problem|worries)\\b/gi, '');\n  // Only a clear yes counts: a no, a question or no answer at all means ask again.\n  const yes = FEE_YES.test(said.replace(/\\bnot sure\\b/gi, \"\"));\n  const agreed = lastFee >= 0 && yes && !FEE_NO.test(said);\n  if (!accepted || !agreed) {\n    return reply(\n      'fee_required',\n      `Before booking, tell the caller: \"${FEE_LINE}\" Book only after a clear yes, with fee_accepted set to true. ` +\n        \"If they say no or aren't sure, don't book.\",\n    );\n  }\n}\n\n// 4. Same call booked already: an identical repeat writes no row, changed details write a correction row\nconst store = $getWorkflowStaticData('global');\nconst booked = (store.bookedCalls = store.bookedCalls || {});\nconst cutoff = Date.now() - DEDUPE_DAYS * 24 * 60 * 60 * 1000;\nconst stamp = (entry) => (typeof entry === 'number' ? entry : (entry && entry.at) || 0);\nfor (const id of Object.keys(booked)) if (stamp(booked[id]) < cutoff) delete booked[id];\nconst details = JSON.stringify([jobType, ...Object.keys(LABELS).map((k) => text(args[k]).toLowerCase()), text(args.notes)]);\nconst earlier = callId ? booked[callId] : undefined;\nif (earlier && earlier.details === details) {\n  return reply('booked', NEXT_STEPS, { duplicate: true });\n}\nif (callId) booked[callId] = { at: Date.now(), details };\nconst notes = earlier ? `Correction of an earlier booking in this call. ${text(args.notes)}`.trim() : text(args.notes);\n\n// 5. Booked\nreturn reply('booked', NEXT_STEPS, {\n  append_row: true,\n  row: {\n    logged_at: new Date().toISOString(),\n    call_id: callId,\n    job_type: jobType,\n    caller_name: text(args.caller_name),\n    phone: text(args.phone),\n    service_address: text(args.service_address),\n    appliance: text(args.appliance_type),\n    brand: text(args.brand),\n    issue: text(args.issue),\n    fee_accepted: jobType === 'warranty' ? 'n/a (warranty)' : 'yes',\n    notes,\n  },\n});\n"
+      },
+      "id": "d12316b4-fb38-4aef-92bd-be71eb225de0",
+      "name": "Validate booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e15a8c77-01d8-4630-8dde-5aa2ca2f05fa",
+              "leftValue": "={{ $json.append_row }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9e36eee4-6d6d-4ebb-abc1-4afd0422569f",
+      "name": "IF new booking",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_GOOGLE_SHEET_URL"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Jobs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "logged_at": "={{ $json.row.logged_at }}",
+            "call_id": "={{ $json.row.call_id }}",
+            "job_type": "={{ $json.row.job_type }}",
+            "caller_name": "={{ $json.row.caller_name }}",
+            "phone": "={{ $json.row.phone }}",
+            "service_address": "={{ $json.row.service_address }}",
+            "appliance": "={{ $json.row.appliance }}",
+            "brand": "={{ $json.row.brand }}",
+            "issue": "={{ $json.row.issue }}",
+            "fee_accepted": "={{ $json.row.fee_accepted }}",
+            "notes": "={{ $json.row.notes }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "logged_at",
+              "displayName": "logged_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "call_id",
+              "displayName": "call_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_type",
+              "displayName": "job_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_name",
+              "displayName": "caller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service_address",
+              "displayName": "service_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appliance",
+              "displayName": "appliance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "brand",
+              "displayName": "brand",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue",
+              "displayName": "issue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fee_accepted",
+              "displayName": "fee_accepted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "5255b2b2-9c4a-4c7c-ad27-aef2b4ef94d3",
+      "name": "Append to Jobs sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": null,
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Validate booking').first().json.response }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "bff0316f-c81e-401f-bcdf-dfd7f9751f3e",
+      "name": "Respond to Retell",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate booking": {
+      "main": [
+        [
+          {
+            "node": "IF new booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF new booking": {
+      "main": [
+        [
+          {
+            "node": "Append to Jobs sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Retell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Jobs sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Retell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

@@ -1,0 +1,35 @@
+{
+  "event": "call_analyzed",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_pc_declined",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550177",
+    "to_number": "+15125550100",
+    "call_status": "ended",
+    "start_timestamp": 1792512000000,
+    "end_timestamp": 1792512192000,
+    "duration_ms": 141000,
+    "disconnection_reason": "agent_hangup",
+    "recording_url": "https://dxc03zgurdly9.cloudfront.net/call_fx_pc_declined/recording.wav",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: ...",
+    "call_analysis": {
+      "call_summary": "Tom Reed asked about a leaking Frigidaire refrigerator. He declined the $99 service call fee, so nothing was booked.",
+      "user_sentiment": "Negative",
+      "call_successful": true,
+      "in_voicemail": false,
+      "custom_analysis_data": {
+        "caller_type": "standard_customer",
+        "outcome": "fee_declined",
+        "caller_name": "Tom Reed",
+        "callback_number": "+15125550177",
+        "appliance": "refrigerator",
+        "brand": "Frigidaire",
+        "issue": "Leaking water",
+        "warranty_mentioned": false,
+        "fee_accepted": false
+      }
+    }
+  }
+}

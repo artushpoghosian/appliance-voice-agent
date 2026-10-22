@@ -1,0 +1,30 @@
+{
+  "event": "call_analyzed",
+  "call": {
+    "call_type": "web_call",
+    "call_id": "call_fx_pc_other",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "call_status": "ended",
+    "start_timestamp": 1792512000000,
+    "end_timestamp": 1792512192000,
+    "duration_ms": 63000,
+    "disconnection_reason": "agent_hangup",
+    "recording_url": "https://dxc03zgurdly9.cloudfront.net/call_fx_pc_other/recording.wav",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: ...",
+    "call_analysis": {
+      "call_summary": "Caller asked for a person about an existing job and wants a <callback> today & soon.",
+      "user_sentiment": "Neutral",
+      "call_successful": true,
+      "in_voicemail": false,
+      "custom_analysis_data": {
+        "caller_type": "other",
+        "outcome": "message_taken",
+        "caller_name": "Sam O'Neil",
+        "notes": "Existing job from last week — wants an update",
+        "warranty_mentioned": false,
+        "fee_accepted": false
+      }
+    }
+  }
+}

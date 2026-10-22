@@ -1,0 +1,82 @@
+{
+  "name": "Retell · error alert",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "93bd8ac3-f8e5-4bff-a675-759a9523e7a9",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Formats an Error Trigger item as \"⚠️ <workflow> failed: <error>\" for Telegram (HTML).\nconst e = $input.first().json;\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst cut = (s, n) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);\n\nconst exec = e.execution || {};\nconst error = exec.error || (e.trigger && e.trigger.error) || {};\nconst workflow = (e.workflow && e.workflow.name) || 'A workflow';\n\nconst lines = [`⚠️ ${esc(workflow)} failed: ${esc(cut(String(error.message || 'unknown error'), 1500))}`];\nif (exec.lastNodeExecuted) lines.push(`Node: ${esc(exec.lastNodeExecuted)}`);\nif (exec.url) lines.push(`<a href=\"${esc(exec.url)}\">Open execution</a>`);\n\nreturn [{ json: { text: lines.join('\\n') } }];\n"
+      },
+      "id": "1528961e-363f-413b-a8be-366bf6d35a2a",
+      "name": "Format error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "PASTE_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "4db6a04c-a7bb-4e7f-b0bf-98835d277556",
+      "name": "Send to Call Feed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": null,
+          "name": "Telegram - Call Feed"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format error": {
+      "main": [
+        [
+          {
+            "node": "Send to Call Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

@@ -1,0 +1,29 @@
+{
+  "name": "book_service_call",
+  "call": {
+    "call_type": "phone_call",
+    "call_id": "call_fx_warranty_lg",
+    "agent_id": "agent_fixture",
+    "direction": "inbound",
+    "from_number": "+15125550199",
+    "to_number": "+15125550100",
+    "call_status": "ongoing",
+    "transcript": "Agent: Thanks for calling Acme Appliance Repair, this is Sam. How can I help?\nUser: My LG washer shows an OE error and it's still under the LG warranty.\nAgent: Got it, LG warranty work has no service fee. Can I get your name?\nUser: Dana Kim, 77 Pine Ave, 512-555-0199.",
+    "transcript_object": [
+      { "role": "agent", "content": "Thanks for calling Acme Appliance Repair, this is Sam. How can I help?" },
+      { "role": "user", "content": "My LG washer shows an OE error and it's still under the LG warranty." },
+      { "role": "agent", "content": "Got it, LG warranty work has no service fee. Can I get your name?" },
+      { "role": "user", "content": "Dana Kim, 77 Pine Ave, 512-555-0199." }
+    ]
+  },
+  "args": {
+    "job_type": "warranty",
+    "caller_name": "Dana Kim",
+    "phone": "+15125550199",
+    "service_address": "77 Pine Ave",
+    "appliance_type": "washer",
+    "brand": "LG",
+    "issue": "OE error, not draining",
+    "notes": "Model WM3900HWA"
+  }
+}
