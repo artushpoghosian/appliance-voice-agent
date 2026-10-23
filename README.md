@@ -2,7 +2,7 @@
 
 A Retell single-prompt phone agent for an appliance repair company's only line. It works out who is calling (standard customer, LG/Samsung/GE warranty customer, home-warranty-company rep, or spam), never books a standard job before the caller accepts the $99 fee, and sends a Telegram alert after every call. The fee, warranty and address rules are checked again on the server before a booking is logged to Google Sheets.
 
-**Live now:** Retell agent version 23 on +1 (302) 309-8447, model `gemini-3.0-flash`. Always deploy with `node --env-file=.env retell/deploy.mjs --publish`: it publishes and moves the phone number to the new version (see [Retell](#5-retell)).
+**Live now:** Retell agent version 26 on +1 (302) 309-8447, model `gemini-3.0-flash`, voice `retell-Rita`. Always deploy with `node --env-file=.env retell/deploy.mjs --publish`: it publishes and moves the phone number to the new version (see [Retell](#5-retell)).
 
 ```
 Caller ─► Retell number ─► Single-Prompt agent
@@ -26,6 +26,9 @@ n8n error workflow: Error Trigger → format → Telegram "⚠️ <workflow> fai
 | `tests/code-nodes.test.mjs` | Runs the Code-node JavaScript straight from the workflow JSON against the fixtures. |
 | `tests/replay.mjs` | Signs the fixtures and posts them to your live n8n. |
 | `tests/test-scenarios.md` | Live test calls for every caller type, with what the agent, Telegram and the Sheet should show. |
+| `tests/playground.mjs` | Text tests: scripted callers (`tests/fixtures/playground/scenarios.json`, incl. stress cases) run through Retell's playground API, with WF-A's real Validate code answering `book_service_call`. Checks the booking rules, re-asked details, two questions in one turn and assistant-speak. Paid per message. |
+| `tests/voice-metrics.mjs` | Reads calls back from Retell and prints reply delay, LLM latency, pace, turn length and "Got it" share against the targets. |
+| `tests/voice-scripts.md` | Short web-call scripts (W1–W5) for judging how Mia sounds. |
 
 ## Environment variables
 
@@ -36,7 +39,7 @@ n8n error workflow: Error Trigger → format → Telegram "⚠️ <workflow> fai
 | `WEBHOOK_SECRET` | deploy, replay | A long random string, e.g. `openssl rand -hex 24`. Same value as the n8n "Retell booking secret" credential. |
 | `RETELL_PHONE_NUMBER` | deploy (keep it set) | Your Retell number in E.164, e.g. `+15125550100`. Every run points it at the version just deployed; without it the number stays on its old version. |
 | `RETELL_AGENT_ID` | deploy (optional) | Set after the first run to update that agent instead of creating a new one. Its LLM is found from the agent. |
-| `RETELL_VOICE_ID` | deploy (optional) | Overrides `voice_id` in `agent.json` (default `retell-Brynne`). |
+| `RETELL_VOICE_ID` | deploy (optional) | Overrides `voice_id` in `agent.json` (default `retell-Rita`). |
 | `RETELL_WEBHOOK_KEY` | replay (optional) | Signing key if it differs from `RETELL_API_KEY`. |
 
 No secrets are stored in any file.
@@ -76,11 +79,14 @@ Import in this order with **Import from File**: `n8n/error-alert.json`, `n8n/wf-
 3. Save the printed `RETELL_AGENT_ID` export. Later runs with it set edit the latest draft in place; if the latest version is published, they first create a new draft from it. The version is published, the phone number is moved to it, and the move is checked.
 4. The phone number is pinned to one agent version. Publishing in the dashboard does **not** move it, so dashboard edits never reach the phone unless you also change Phone Numbers → your number → Inbound call agent (or pick the **Latest Published** tag there). Edit the repo and deploy instead.
 5. `node retell/deploy.mjs --dry-run` prints the request bodies (secret masked) without calling the API.
+6. `node --env-file=.env retell/deploy.mjs --draft` updates the draft only, for dashboard web tests (agent page → pick the draft version → Test Audio). It never publishes or moves the phone.
 
 ### 6. Test
 ```bash
 node --test
 node tests/replay.mjs
+node --env-file=.env tests/playground.mjs --version=N --set=quick   # or --set=stress, --set=full, --only=A1,S3 (paid)
+node --env-file=.env tests/voice-metrics.mjs --version=N --type=web_call
 ```
 Then work through `tests/test-scenarios.md`.
 
@@ -107,20 +113,42 @@ If a credential with the exact name already exists, n8n usually picks it automat
 |---|---|
 | Company name, agent name | `retell/llm.json` → `default_dynamic_variables` |
 | Time zone | `retell/agent.json` → `timezone` **and** WF-B → Build alert → `TIME_ZONE` |
-| Line after booking | WF-A → Validate booking → `NEXT_STEPS` (default "The office will reach out to confirm the appointment time.") |
+| Line after booking | WF-A → Validate booking → `NEXT_STEPS` (default "You're all set. The office will call you to confirm a time.") |
 | Model, temperature | `retell/llm.json` → `model_config` (default `gemini-3.0-flash`, 0.2). `claude-5.5-sonnet` follows the prompt more closely but tends to say its reasoning out loud; the n8n checks below hold either way. |
-| Voice | `retell/agent.json` → `voice_id`, or `RETELL_VOICE_ID` |
+| Voice | `retell/agent.json` → `voice_id` (Rita), `voice_speed` 1.1, expressive mode with natural pauses, dynamic responsiveness, backchannel 0.5; or `RETELL_VOICE_ID` |
+
+## Voice tuning (v25–v26)
+
+Reviewers asked for Mia to sound as human as possible. v25 keeps v23's prompt and model, which held up best under stress, and changes how she talks:
+
+- **Warm but brief:** "please" in most questions, one short line of sympathy per call, the caller's name once, and answers to side questions before going on.
+- **Steady:** never re-asks what she has, never restarts the intake after a declined fee, one question per turn, and re-books when the caller changes the brand, the warranty status or a detail after booking.
+- **No assistant tics:** no "certainly", "what seems to be the problem", "Got it, [restates]", or "one moment… it's booked" back to back.
+- **Booking:** no scripted line before booking. Retell says "One moment." while n8n saves.
+- **Voice:** Rita (v26) at speed 1.1 (about 165 words a minute), expressive pauses, and fewer "mm-hmm"s.
+- **Guards added in n8n:** reply lines Mia can say as they are, a casual yes ("go for it") counts, and a phone without a real number (or a US number that isn't +1 and ten digits) is asked again.
+
+| Measured on test calls | v23 | v25 |
+|---|---|---|
+| Typical reply delay after the caller stops | 1.36 s | about 1.3–1.7 s |
+| Worst silence | 8.1 s | 4.3 s |
+| Pace | 205 wpm | 165 wpm |
+| Turns opening with "Got it" | 16% | 0% |
+| Stress text tests (6 cases from a real hard call) | 4 of 6 | 6 of 6 on the first v25 prompt; later tweaks were checked on web calls |
+
+`gpt-4.1-mini` on the fast tier replied faster but lost track under stress, and `gpt-4.1` (fast) did no better, so v25 stays on `gemini-3.0-flash`.
 
 ## How the guards work
 
-**WF-A Validate booking** answers Retell with `{result, say}`; the agent acts on `say`.
+**WF-A Validate booking** answers Retell with `{result, say}`; `say` is a line the agent says to the caller as it is.
 
 | Check (in order) | Result |
 |---|---|
-| A required argument is empty, or `job_type` isn't `standard`/`warranty` | `missing`, "Ask for <field>, then try again." |
-| Service address has no house number, and `notes` don't say "No house number" | `missing`, ask for the house number |
-| `warranty` job, brand not LG, Samsung, GE or General Electric | `not_covered`, offer a standard visit with the $99 fee |
-| `standard` job: `fee_accepted` isn't true, or the caller's answer to the **last** agent turn saying `$99` / "ninety-nine" isn't a clear yes (a no, "not sure", a question or no answer) | `fee_required`, say the fee line and get a clear yes |
+| `job_type` isn't `standard`/`warranty` | `missing`, `Set job_type to standard or warranty, then try again.` |
+| A required argument is empty | `missing`, the question for the first empty one, e.g. "What's the best number to reach you?" |
+| Service address has no house number, and `notes` don't say "No house number" | `missing`, "What's the house number there?" |
+| `warranty` job, brand not LG, Samsung, GE or General Electric | `not_covered`, "We only do warranty work for LG, Samsung and GE, but I can still send a technician out. The service call fee is $99. Is that okay?" |
+| `standard` job: `fee_accepted` isn't true, or the caller's answer to the **last** agent turn saying `$99` / "ninety-nine" isn't a clear yes (a no, "not sure", "don't", a question or no answer) | `fee_required`, "Before I book it, there's a $99 service call fee for the technician to come out. Is that okay?" |
 | `call_id` already booked with identical details (workflow static data, kept 30 days) | `booked`, no second row |
 | `call_id` already booked with different details | `booked`, a new row whose notes start "Correction of an earlier booking in this call." |
 | Otherwise | `booked`, `NEXT_STEPS`, and one Sheet row |
@@ -139,9 +167,9 @@ What `deploy.mjs` sets, if you prefer to build it by hand:
 | Model `gemini-3.0-flash`, temperature 0.2 | Agent → LLM model dropdown → settings |
 | Agent speaks first: "Thanks for calling {{company_name}}, this is {{agent_name}}. How can I help?" | Welcome message → AI speaks first, custom message |
 | `company_name`, `agent_name` defaults | Security & fallback settings → Default dynamic variables |
-| `book_service_call` (POST, WF-A URL, header `X-Webhook-Secret`, payload args only **off**, speak during execution **off** (the prompt gives the exact line), speak after **on**, timeout 10000 ms, parameters from `llm.json`) | Functions → + Add → Custom function |
+| `book_service_call` (POST, WF-A URL, header `X-Webhook-Secret`, payload args only **off**, speak during execution **on** with the static sentence "Okay - one sec.", speak after **on**, timeout 10000 ms, parameters from `llm.json`) | Functions → + Add → Custom function |
 | `end_call` | Functions → + Add → End call |
-| Voice `retell-Brynne`, backchannel on | Voice settings / Speech settings |
+| Voice `retell-Rita`, speed 1.1, expressive mode on (pause tag), backchannel on at 0.5 ("mm-hmm, okay, yeah, right"), interruption sensitivity 0.9, dynamic responsiveness on | Voice settings / Speech settings |
 | Boosted keywords | Speech settings → Boosted keywords |
 | End call after 30 s silence, max 15 min | Call settings |
 | Post-call fields (`caller_type`, `outcome`, text and boolean fields) | Post-Call Extraction → + Add (enum = Selector) |

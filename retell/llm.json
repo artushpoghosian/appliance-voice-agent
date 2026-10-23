@@ -20,15 +20,15 @@
     {
       "type": "custom",
       "name": "book_service_call",
-      "description": "Book a repair visit. Call once, only after the intake details are in and, for a standard job, the caller clearly accepted the $99 service call fee. Never for warranty-company reps, spam, or callback messages. Relay only the returned `say`; it is booked only if `result` is `booked`.",
+      "description": "Book a repair visit. Call once, only after the intake details are in and, for a standard job, the caller clearly accepted the $99 service call fee. Never for warranty-company reps, spam, or callback messages. Say the returned `say` as it is; it is booked only if `result` is `booked`.",
       "url": "${N8N_BASE_URL}/webhook/retell/book-service-call",
       "method": "POST",
       "headers": { "X-Webhook-Secret": "${WEBHOOK_SECRET}" },
       "args_at_root": false,
-      "speak_during_execution": false,
+      "speak_during_execution": true,
       "speak_after_execution": true,
       "execution_message_type": "static_text",
-      "execution_message_description": "One moment while I book that.",
+      "execution_message_description": "One moment.",
       "timeout_ms": 10000,
       "parameters": {
         "type": "object",
@@ -39,7 +39,7 @@
             "description": "warranty only when the caller said the appliance is under the manufacturer's warranty; otherwise standard."
           },
           "caller_name": { "type": "string", "description": "Caller's full name." },
-          "phone": { "type": "string", "description": "Confirmed callback number, digits only with country code, e.g. +15125550142." },
+          "phone": { "type": "string", "description": "Confirmed callback number the caller gave or the real caller ID: \"+\" and digits only, with the country code (US: +1 and ten digits). Never an example or a made-up number." },
           "service_address": { "type": "string", "description": "Confirmed service address: street, unit, city." },
           "appliance_type": { "type": "string", "description": "The appliance, e.g. dryer, refrigerator, dishwasher." },
           "brand": { "type": "string", "description": "Appliance brand as the caller said it." },

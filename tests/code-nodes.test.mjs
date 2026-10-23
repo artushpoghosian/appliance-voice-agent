@@ -1,37 +1,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
+import { root, readJson, node, code, run, validateBooking } from './lib/n8n-code.mjs';
 
-const root = new URL('../', import.meta.url);
-const readJson = (p) => JSON.parse(readFileSync(new URL(p, root), 'utf8'));
-const require = createRequire(import.meta.url);
-const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const expected = readJson('tests/fixtures/expected.json');
 
 const WF_A = 'n8n/wf-a-booking-function.json';
 const WF_B = 'n8n/wf-b-post-call-alert.json';
 const WF_ERR = 'n8n/error-alert.json';
-
-function node(workflowFile, name) {
-  const wf = readJson(workflowFile);
-  const n = wf.nodes.find((x) => x.name === name);
-  assert.ok(n, `node "${name}" not found in ${workflowFile}`);
-  return n;
-}
-
-function code(workflowFile, name) {
-  const n = node(workflowFile, name);
-  assert.equal(n.type, 'n8n-nodes-base.code');
-  return n.parameters.jsCode;
-}
-
-function run(jsCode, { items, vars = {}, staticData = {}, helpers } = {}) {
-  const $input = { first: () => items[0], last: () => items[items.length - 1], all: () => items };
-  const fn = new AsyncFunction('$input', '$json', '$vars', '$getWorkflowStaticData', 'require', 'helpers', jsCode);
-  return fn($input, items[0]?.json, vars, () => staticData, require, helpers);
-}
 
 // WF-A
 
@@ -40,6 +17,12 @@ describe('WF-A Validate booking', () => {
   const fixture = (name) => readJson(`tests/fixtures/booking/${name}.json`);
   const webhookItem = (body) => ({ json: { headers: {}, params: {}, query: {}, body } });
   const go = async (body, staticData = {}) => (await run(validate, { items: [webhookItem(body)], staticData }))[0].json;
+
+  test('validateBooking helper runs the Validate booking node', async () => {
+    const out = await validateBooking(readJson('tests/fixtures/booking/warranty-lg.json'));
+    assert.equal(out.result, 'booked');
+    assert.equal(out.append_row, true);
+  });
 
   for (const [name, result] of Object.entries(expected.booking)) {
     test(`fixture ${name} -> ${result}`, async () => {
@@ -52,7 +35,7 @@ describe('WF-A Validate booking', () => {
 
   test('booked: say is NEXT_STEPS and the row matches the sheet header', async () => {
     const out = await go(fixture('standard-fee-accepted'));
-    assert.equal(out.say, 'The office will reach out to confirm the appointment time.');
+    assert.equal(out.say, "You're all set. The office will call you to confirm a time.");
     assert.deepEqual(Object.keys(out.row), [
       'logged_at', 'call_id', 'job_type', 'caller_name', 'phone', 'service_address',
       'appliance', 'brand', 'issue', 'fee_accepted', 'notes',
@@ -69,8 +52,7 @@ describe('WF-A Validate booking', () => {
     delete body.args.fee_accepted;
     const out = await go(body);
     assert.equal(out.result, 'fee_required');
-    assert.match(out.say, /\$99/);
-    assert.match(out.say, /clear yes/i);
+    assert.equal(out.say, "Before I book it, there's a $99 service call fee for the technician to come out. Is that okay?");
   });
 
   test('fee_required: fee_accepted false', async () => {
@@ -137,13 +119,13 @@ describe('WF-A Validate booking', () => {
     assert.equal((await go(withEnding([['agent', FEE]]))).result, 'fee_required');
   });
 
-  for (const answer of ["I'm not sure.", 'Nope.', 'Hmm, no, $99 is too much for me.', 'No, but just book it.', "No, that's not okay."]) {
+  for (const answer of ["I'm not sure.", 'Nope.', 'Hmm, no, $99 is too much for me.', 'No, but just book it.', "No, that's not okay.", "Don't do it.", 'Do not book it.']) {
     test(`fee_required: answer "${answer}" is not a yes`, async () => {
       assert.equal((await go(withEnding([['agent', FEE], ['user', answer]]))).result, 'fee_required');
     });
   }
 
-  for (const answer of ['Yes, no problem.', 'Sure, go ahead.', 'Yes. This is very fine.']) {
+  for (const answer of ['Yes, no problem.', 'Sure, go ahead.', 'Yes. This is very fine.', 'Go for it.', "Let's do it.", 'Book it.']) {
     test(`booked: answer "${answer}" is a yes`, async () => {
       assert.equal((await go(withEnding([['agent', FEE], ['user', answer]]))).result, 'booked');
     });
@@ -181,6 +163,7 @@ describe('WF-A Validate booking', () => {
       assert.equal(out.result, 'not_covered');
       assert.match(out.say, /LG, Samsung( and|,) GE/);
       assert.match(out.say, /\$99/);
+      assert.match(out.say, /Is that okay\?$/);
       assert.equal(out.append_row, false);
     });
   }
@@ -188,7 +171,7 @@ describe('WF-A Validate booking', () => {
   test('missing: names the missing field', async () => {
     const out = await go(fixture('missing-address'));
     assert.equal(out.result, 'missing');
-    assert.match(out.say, /^Ask for the service address, then try again\.$/);
+    assert.equal(out.say, "What's the address for the visit?");
   });
 
   for (const name of ['standard-fee-accepted', 'warranty-lg']) {
@@ -197,7 +180,7 @@ describe('WF-A Validate booking', () => {
       body.args.service_address = 'Chekhov Street, Yerevan';
       const out = await go(body);
       assert.equal(out.result, 'missing');
-      assert.match(out.say, /house number/);
+      assert.equal(out.say, "What's the house number there?");
       assert.equal(out.append_row, false);
     });
   }
@@ -215,9 +198,19 @@ describe('WF-A Validate booking', () => {
     delete body.args.phone;
     const out = await go(body);
     assert.equal(out.result, 'missing');
-    assert.match(out.say, /callback number/);
-    assert.match(out.say, /brand/);
+    assert.equal(out.say, "What's the best number to reach you?");
   });
+
+  for (const phone of ['{{user_number}}', 'this number', '+1 555', '+145679101111']) {
+    test(`missing: phone "${phone}" has no real number -> ask for one`, async () => {
+      const body = fixture('warranty-lg');
+      body.args.phone = phone;
+      const out = await go(body);
+      assert.equal(out.result, 'missing');
+      assert.equal(out.say, "What's the best number to reach you?");
+      assert.equal(out.append_row, false);
+    });
+  }
 
   test('missing: invalid job_type', async () => {
     const body = fixture('standard-fee-accepted');

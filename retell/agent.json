@@ -1,9 +1,16 @@
 {
   "agent_name": "Appliance repair receptionist",
-  "voice_id": "retell-Brynne",
+  "voice_id": "retell-Rita",
+  "voice_speed": 1.1,
+  "enable_expressive_mode": true,
+  "expressive_emotion_tags": ["pause"],
   "language": "en-US",
   "timezone": "America/New_York",
+  "enable_dynamic_responsiveness": true,
+  "interruption_sensitivity": 0.9,
   "enable_backchannel": true,
+  "backchannel_frequency": 0.5,
+  "backchannel_words": ["mm-hmm", "okay", "yeah", "right"],
   "boosted_keywords": [
     "LG", "Samsung", "GE", "General Electric", "Whirlpool", "Frigidaire", "Maytag",
     "KitchenAid", "Bosch", "American Home Shield", "Choice Home Warranty",

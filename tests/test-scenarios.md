@@ -14,7 +14,7 @@ Every call should produce **one Telegram alert** in Call Feed within about a min
 6. Yes, that's right.
 7. Yes, $99 is okay.
 
-**Mia must:** One question per turn; confirms number and address once; says the exact $99 line before booking; after booking says the office will reach out to confirm the time (no date or time).
+**Mia must:** One question per turn; confirms number and address once; says the exact $99 line before booking; after booking says the office will call to confirm a time (no date or time).
 
 **Telegram:** 🔧 New booking: standard job  
 **Sheet:** 1 row, job_type standard, fee_accepted true

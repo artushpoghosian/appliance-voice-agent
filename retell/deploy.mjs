@@ -5,6 +5,11 @@ const DIR = new URL('./', import.meta.url);
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has('--dry-run');
 const publish = args.has('--publish');
+const draft = args.has('--draft'); // update the draft for web tests; never publish or move the phone
+if (draft && publish) {
+  console.error('Use --draft or --publish, not both.');
+  process.exit(1);
+}
 
 const env = process.env;
 const missing = ['RETELL_API_KEY', 'N8N_BASE_URL', 'WEBHOOK_SECRET'].filter((k) => !env[k] && !(dryRun && k === 'RETELL_API_KEY'));
@@ -109,7 +114,10 @@ try {
     console.log(`Published agent version ${agent.version}`);
   }
 
-  if (env.RETELL_PHONE_NUMBER) {
+  if (draft) {
+    console.log('Draft only: the phone number stays on its current version.');
+    console.log(`Draft agent version ${agent.version} is ready for web tests.`);
+  } else if (env.RETELL_PHONE_NUMBER) {
     const number = await api('PATCH', `/update-phone-number/${enc(env.RETELL_PHONE_NUMBER)}`, {
       inbound_agents: [{ agent_id: agent.agent_id, agent_version: agent.version, weight: 1 }],
     });

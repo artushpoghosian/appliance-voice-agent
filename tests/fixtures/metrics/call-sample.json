@@ -1,0 +1,16 @@
+{ "call_id": "call_fx_metrics", "call_type": "web_call",
+  "latency": { "llm": { "values": [0, 500, 700] } },
+  "transcript_object": [
+    { "role": "agent", "content": "Thanks for calling. How can I help?", "words": [
+      {"word":"Thanks ","start":0,"end":0.3},{"word":"for ","start":0.3,"end":0.4},{"word":"calling. ","start":0.4,"end":0.8},
+      {"word":"How ","start":1.2,"end":1.4},{"word":"can ","start":1.4,"end":1.5},{"word":"I ","start":1.5,"end":1.6},{"word":"help? ","start":1.6,"end":2}]},
+    { "role": "user", "content": "My dryer stopped heating.", "words": [
+      {"word":"My ","start":3,"end":3.2},{"word":"dryer ","start":3.2,"end":3.6},{"word":"stopped ","start":3.6,"end":4},{"word":"heating. ","start":4,"end":4.5}]},
+    { "role": "agent", "content": "Got it, what brand is it?", "words": [
+      {"word":"Got ","start":5.5,"end":5.7},{"word":"it, ","start":5.7,"end":5.9},{"word":"what ","start":5.9,"end":6.1},
+      {"word":"brand ","start":6.1,"end":6.3},{"word":"is ","start":6.3,"end":6.4},{"word":"it? ","start":6.4,"end":6.7}]},
+    { "role": "user", "content": "Whirlpool.", "words": [{"word":"Whirlpool. ","start":6.5,"end":7}]},
+    { "role": "agent", "content": "## Current Date and Time", "words": [
+      {"word":"## ","start":7.4,"end":7.5},{"word":"Current ","start":7.5,"end":7.8},{"word":"Date ","start":7.8,"end":8},
+      {"word":"and ","start":8,"end":8.1},{"word":"Time ","start":8.1,"end":8.4}]}
+  ] }
